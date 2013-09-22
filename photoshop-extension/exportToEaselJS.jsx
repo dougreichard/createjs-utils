@@ -29,7 +29,7 @@ var layerIndex = 0 ;
 var totalFrames = 0;
 var outputTxt = "";
 var le = "\n";
-
+var commonSheet = [];
 
 function main () {
 
@@ -78,15 +78,30 @@ function main () {
 	// Start library output	
 	outputTxt += beginOutput(libName, imageName);
 	
+    
+    // Manage frames common throught the document
+    
+    for(var cmSprite = 0; cmSprite < destDoc.layers.length; cmSprite++) {
+        var spriteLayer = destDoc.layers[cmSprite];
+        if (spriteLayer.name.indexOf("+") >=0) {
+                commonSheet.push(spriteLayer);
+                continue;
+        }
+    }
 
 	// Process each sprite	
 	for (var i = 0 ; i < destDoc.layerSets.length ; i++) {
 		var spriteSet = destDoc.layerSets[i];
 		spriteSet.allLocked=false;
 		var destName = spriteSet.name;
-		var spriteTxt = processSprite(destDoc, spriteSet.layerSets, destName, cols, rows, w, h);
+		var spriteTxt = processSprite(destDoc, spriteSet, destName, cols, rows, w, h);
 		outputTxt += spriteTxt;		
 	}
+    
+    // Remove the commonSheet now that they are cloned
+    for(var c = commonSheet.length-1; c >=0; c--) {
+        commonSheet[c].remove();
+    }
 	
 	// End library output
 	outputTxt += endOutput(libName);
@@ -154,7 +169,7 @@ function beginOutput(libName, imageName){
 
 
 
-function processSprite(doc, layerSets, destName, cols, rows, w, h) {
+function processSprite(doc, spriteSet, destName, cols, rows, w, h) {
 
 	var t = "";
 
@@ -162,13 +177,29 @@ function processSprite(doc, layerSets, destName, cols, rows, w, h) {
     var framesTxt = "frames:[";
 
 	// stores the frame count for this sprite
-	var frameCount = 0;            
+	var frameCount = 0;  
+    
+    var animationSets = spriteSet.layerSets;
+    
+    // Manage frames common throught the sprite
+    var commonSprite = [];
+    
+    for(var cmSprite = 0; cmSprite < spriteSet.layers.length; cmSprite++) {
+        var spriteLayer = spriteSet.layers[cmSprite];
+        if (spriteLayer.name.indexOf("+") >=0) {
+                commonSprite.push(spriteLayer);
+                continue;
+        }
+    }
 
-    for( var n = 0 ; n < layerSets.length ; n++){
+    
+    for( var n = 0 ; n < animationSets.length ; n++){
         
-        var set = layerSets[n];
+        var set = animationSets[n];
 		set.allLocked=false;
         var setName = set.name;
+        
+        
         
         var thisFrequency = defaultFrequency;
         var nextAnimation = '';
@@ -191,8 +222,8 @@ function processSprite(doc, layerSets, destName, cols, rows, w, h) {
             
         
         
-        var destinations =[];
-        var common = [];
+        var destinationsAnimation =[];
+        var commonAnimation = [];
         for( var i = 0 ; i < set.layers.length ; i++){
             
             var layer = set.layers[i];
@@ -206,7 +237,7 @@ function processSprite(doc, layerSets, destName, cols, rows, w, h) {
 				frameCount++;
                 continue;
             }  else if (layerName.indexOf("+") >=0) {
-                common.push(layer);
+                commonAnimation.push(layer);
                 continue;
             }
             
@@ -220,7 +251,7 @@ function processSprite(doc, layerSets, destName, cols, rows, w, h) {
             var dest = {destx: destx, desty:desty};
             
             // Save the desination 
-            destinations.push(dest);
+            destinationsAnimation.push(dest);
             
             doc.activeLayer.translate(dest.destx, dest.desty);
            
@@ -240,29 +271,50 @@ function processSprite(doc, layerSets, destName, cols, rows, w, h) {
 			layerIndex++;
 			frameCount++;
         }
-        // Copy the common to all frames
+        // Copy the common frames to all frames
         // They are placed relative to the layer its duplicating
-         for (var d = 0; d < destinations.length; d++) {
-             for (var above=0;above < common.length; above++) {
-                var copy = common[above].duplicate();
-                copy.move(common[above], ElementPlacement.PLACEBEFORE );
+         for (var d = 0; d < destinationsAnimation.length; d++) {
+             for (var above=0;above < commonAnimation.length; above++) {
+                var copy = commonAnimation[above].duplicate();
+                copy.move(commonAnimation[above], ElementPlacement.PLACEBEFORE );
                 
                 doc.activeLayer = copy;
                 doc.activeLayer.allLocked=false;
-                doc.activeLayer.translate(destinations[d].destx, destinations[d].desty);
+                doc.activeLayer.translate(destinationsAnimation[d].destx, destinationsAnimation[d].desty);
+             }
+             
+             for (var above=0;above < commonSprite.length; above++) {
+                var copy = commonSprite[above].duplicate();
+                copy.move(commonSprite[above], ElementPlacement.PLACEBEFORE );
+                
+                doc.activeLayer = copy;
+                doc.activeLayer.allLocked=false;
+                doc.activeLayer.translate(destinationsAnimation[d].destx, destinationsAnimation[d].desty);
+             }
+             
+             for (var sheet=0;sheet < commonSheet.length; sheet++) {
+                var copy = commonSheet[sheet].duplicate();
+                copy.move(commonSheet[sheet], ElementPlacement.PLACEBEFORE );
+                
+                doc.activeLayer = copy;
+                doc.activeLayer.allLocked=false;
+                doc.activeLayer.translate(destinationsAnimation[d].destx, destinationsAnimation[d].desty);
              }
            }
       
-        // Remove the common now that they are cloned
-        for(var c = common.length-1; c >=0; c--) {
-            common[c].remove();
-        }
+       
  
 		// TODO: deal with "frequency" & "next" parameters
         animsTxt += "], frequency:" + thisFrequency;
         if (nextAnimation) animsTxt += ", next: '" + nextAnimation + "'},";
         else animsTxt += ", next:true},";
     }
+    
+
+        // Remove the commonSprite now that they are cloned
+        for(var c = commonSprite.length-1; c >=0; c--) {
+            commonSprite[c].remove();
+        }
 
 	
 	// sprite defintion
